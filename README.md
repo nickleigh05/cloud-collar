@@ -1,8 +1,8 @@
-# Cloud Collar
+# ☁️ Cloud Collar 🐾
 
 ![CI](https://github.com/nickleigh05/cloud-collar/actions/workflows/ci.yml/badge.svg)
 
-A real-time employee productivity analytics system that tracks behavior — time on the floor, phone usage, idle time — using a camera feed processed entirely on-device. No facial recognition. No video leaves the machine.
+A real time employee productivity analytics system that tracks behavior: time on the floor, phone usage, and idle time. The camera feed is processed entirely on device and analytics are sent to the cloud for storage and reporting. Raw video never leaves the machine.
 
 ---
 
@@ -14,11 +14,11 @@ A real-time employee productivity analytics system that tracks behavior — time
 
 ## Why I built this
 
-I wanted a tool that could actually measure employee productivity in a real workplace — not just headcount, but behavior. How long is someone on the floor? How often are they picking up their phone? Are they idle?
+I wanted a tool that could actually measure employee productivity in a real workspace, in real time. Not just the number of people on the floor, but how they behave: how long is someone working? How often are they picking up their phone? Are they idle?
 
-Every existing solution I looked at was either way too invasive (facial recognition, full video streamed to a cloud server) or too shallow to be useful. I wanted something in between: rich behavioral data, with a privacy model I could actually defend.
+Every existing solution I looked at was either way too invasive (facial recognition, full video streamed to a cloud server) or too shallow to be useful. Streaming raw video burns compute you don't need to spend. I wanted something smarter: rich behavioral data with an approach I could actually defend.
 
-The core insight is that you don't need to know *who* someone is to track how they behave. Cloud Collar gives every person an anonymous ID based on their appearance and tracks their session from there. The cloud never sees anything except numbers.
+The core insight is that you don't need to know *who* someone is to track how they behave. Cloud Collar gives every person an anonymous ID based on their appearance and tracks their session from there. The cloud never sees anything except numbers, which keeps the analysis at the team level. One or two people spending too much time on their phone? The data shows it.
 
 ---
 
@@ -34,21 +34,21 @@ The core insight is that you don't need to know *who* someone is to track how th
   Tracker accumulates per-person session data
   Uploader POSTs anonymous JSON snapshots every 30s
         |
-        | HTTPS  (JSON only — never video)
+        | HTTPS  (JSON only, never video)
         v
   AWS API Gateway → Lambda → DynamoDB
 ```
 
-### Re-identification — the hard part
+### Re-identification: the hard part
 
-Standard trackers like ByteTrack assign a track ID to each visible person. When someone steps out of frame, the track dies — and when they walk back in, they're a brand new ID. That's fine for object counting, but useless for session-level analytics.
+Standard trackers like ByteTrack assign a track ID to each visible person. When someone steps out of frame, the track dies, and when they walk back in, they're a brand new ID. That's fine for object counting, but useless for session-level analytics.
 
 Cloud Collar layers appearance-based re-identification on top to maintain continuity:
 
-- Each person crop is run through a **ResNet18** backbone (pretrained on ImageNet, classifier removed) to produce a 512-d L2-normalized embedding — a fingerprint of how that person looks.
+- Each person crop is run through a **ResNet18** backbone (pretrained on ImageNet, classifier removed) to produce a 512-d L2-normalized embedding: a fingerprint of how that person looks.
 - New tracks buffer a few frames before a decision is made, so one blurry frame can't cause a misidentification.
 - The averaged embedding is compared against all known persons using cosine similarity. Above the match threshold, the track is merged into the existing record. Below it, a new person ID is created.
-- People currently in frame are excluded from matching — one person can't be in two places at once.
+- People currently in frame are excluded from matching: one person can't be in two places at once.
 - Embeddings are refreshed as a running average every 15 frames, adapting to lighting and pose changes over time.
 
 ### What gets tracked per person
@@ -60,21 +60,31 @@ Cloud Collar layers appearance-based re-identification on top to maintain contin
 | Idle time | Seconds stationary beyond the movement threshold |
 | Away time | Seconds a known person was absent from the frame |
 
+#### Coming soon
+
+| Metric | Description |
+|---|---|
+| Drinks made | Count of items prepared per session |
+| Orders fulfilled | Orders completed start to finish |
+| Product wasted | Instances of discarded or unused product |
+
+These metrics push Cloud Collar beyond employee behavior into the broader cost of running a business: inventory turnover, fulfillment efficiency, and waste. The same system tracking how people work can also track what's being produced, what's being lost, and where money is going.
+
 ---
 
-## Tech stack — and why
+## Tech stack and why
 
-**YOLOv8s** — Fast enough for real-time inference on edge hardware without a dedicated GPU. The small variant hits the right balance of speed and accuracy for person detection.
+🎯 **YOLOv8s:** Fast enough for real time inference on edge hardware without a dedicated GPU. The small variant hits the right balance of speed and accuracy for person detection.
 
-**ByteTrack** — Built into Ultralytics, handles short-lived track assignment with no extra configuration. Paired with the re-ID layer, it becomes a robust full-session tracker.
+🔁 **ByteTrack:** Built into Ultralytics, handles short-lived track assignment with no extra configuration. Paired with the re-ID layer, it becomes a robust full-session tracker.
 
-**ResNet18** — Lightweight enough to run on a Raspberry Pi. With the classification head removed, the final feature layer produces appearance embeddings that generalize well to unseen people without any fine-tuning.
+🧠 **ResNet18:** Lightweight enough to run on a Raspberry Pi. With the classification head removed, the final feature layer produces appearance embeddings that generalize well to unseen people without any fine-tuning.
 
-**AWS Lambda** — Serverless, so the backend scales to zero when the system isn't running. No instances to manage, and the cost for a single-camera deployment is negligible.
+⚡ **AWS Lambda:** Serverless, so the backend scales to zero when the system isn't running. No instances to manage, and the cost for a single-camera deployment is negligible.
 
-**DynamoDB** — Pay-per-request and schemaless. Session records have a variable number of persons, so a fixed relational schema would just add friction.
+🗄️ **DynamoDB:** Pay-per-request and schemaless. Session records have a variable number of persons, so a fixed relational schema would just add friction.
 
-**Terraform** — One `terraform apply` stands up the entire backend in about 30 seconds. `terraform destroy` tears it down cleanly. The whole infrastructure is version-controlled and reproducible.
+🏗️ **Terraform:** One `terraform apply` stands up the entire backend in about 30 seconds. `terraform destroy` tears it down cleanly. The whole infrastructure is version-controlled and reproducible.
 
 ---
 
@@ -83,7 +93,7 @@ Cloud Collar layers appearance-based re-identification on top to maintain contin
 ### Prerequisites
 
 - Python 3.12+
-- A webcam or video file
+- A camera or video file
 - AWS account + AWS CLI configured (`aws configure`)
 - Terraform installed
 
@@ -123,7 +133,7 @@ cd edge
 python main.py
 ```
 
-Press `q` to quit. Set `VIDEO_PATH = 0` in `main.py` for a live webcam, or point it at a video file.
+Press `q` to quit. Set `VIDEO_PATH = 0` in `main.py` for a live camera feed, or point it at a video file.
 
 ---
 
@@ -152,11 +162,11 @@ cloud-collar/
 
 ---
 
-## Privacy
+## 🔒 Privacy
 
 This was a first-class design constraint, not an afterthought.
 
-- Raw video never leaves the device. All inference — detection, tracking, re-ID — runs locally.
+- Raw video never leaves the device. All inference (detection, tracking, re-ID) runs locally.
 - No facial recognition. Embeddings describe whole-body appearance and are never uploaded.
 - The cloud receives only anonymous numeric IDs, timestamps, and durations.
 - Embeddings live only in memory for the duration of a run and are discarded on exit.
@@ -171,4 +181,4 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-Tests use fake embeddings — no camera or GPU needed. CI runs on every push.
+Tests use fake embeddings. No camera, no GPU, no coworkers needed. CI runs on every push.
