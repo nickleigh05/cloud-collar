@@ -8,9 +8,7 @@ A real-time employee productivity analytics system that tracks behavior — time
 
 ## Demo
 
-> Demo video coming soon.
-
-<!-- Drop your GIF or video link here once recorded -->
+<video src="https://github.com/user-attachments/assets/73dc262c-4522-4b2c-8d1e-4272f53b9319" width="800" autoplay loop muted playsinline></video>
 
 ---
 
