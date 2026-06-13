@@ -1,11 +1,25 @@
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# model weights
 *.pt
+
+# footage (never commit video files)
 *.mp4
 *.mov
 *.avi
 *.MOV
 *.MP4
 *.AVI
+
+# environment config
 .env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+infra/build/
