@@ -97,9 +97,9 @@ class Person:
 
 class Tracker:
 
-    def __init__(self):
+    def __init__(self, extractor=None):
 
-        self.extractor = EmbeddingExtractor()
+        self.extractor = extractor or EmbeddingExtractor()
         self.persons: dict[int, Person] = {}
         self.track_to_person: dict[int, int] = {}
         self.pending: dict[int, list[np.ndarray]] = {}
