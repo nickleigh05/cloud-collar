@@ -1,4 +1,5 @@
 import time
+from collections import deque
 
 import numpy as np
 
@@ -107,6 +108,7 @@ class Tracker:
         self.next_person_id = 1
         self.frame_count = 0
         self._last_line_count = 0
+        self._event_log: deque[str] = deque(maxlen=3)
 
     def update(self, person_results, phone_boxes, frame):
 
@@ -176,14 +178,16 @@ class Tracker:
             person.mark_returned(now)
             person.last_seen = now
             person.add_embedding(average)
-            print(f"[tracker] person {person_id} returned "
-                  f"(similarity {similarity:.2f}) — track {track_id}")
+            self._event_log.append(
+                f"  [re-id] person {person_id} returned (similarity {similarity:.2f})"
+            )
         else:
             person_id = self.next_person_id
             self.next_person_id += 1
             self.persons[person_id] = Person(person_id, average)
-            print(f"[tracker] new person detected — ID {person_id} "
-                  f"(best match was {similarity:.2f})")
+            self._event_log.append(
+                f"  [re-id] new person — ID {person_id}"
+            )
 
         stale = [t for t, p in self.track_to_person.items() if p == person_id and t != track_id]
         for t in stale:
@@ -274,13 +278,31 @@ class Tracker:
             "away_time_seconds": round(away_time, 2),
         }
 
+    # matches the BGR COLORS list in main.py, converted to RGB for ANSI true color
+    _ANSI_COLORS = [
+        "\033[38;2;80;80;255m",    # blue
+        "\033[38;2;255;80;80m",    # red
+        "\033[38;2;80;255;80m",    # green
+        "\033[38;2;0;180;255m",    # cyan
+        "\033[38;2;255;0;180m",    # magenta
+        "\033[38;2;255;200;0m",    # yellow
+        "\033[38;2;0;140;255m",    # teal
+        "\033[38;2;220;255;100m",  # lime
+    ]
+    _RESET = "\033[0m"
+
     def print_all(self):
 
         now = time.time()
-        lines = []
+        lines = []  # list of (text, person_id or None)
+
+        for event in self._event_log:
+            lines.append((event, None))
+        if self._event_log:
+            lines.append(("  " + "─" * 58, None))
 
         if not self.persons:
-            lines.append("  waiting for detections...")
+            lines.append(("  waiting for detections...", None))
         else:
             for person in self.persons.values():
                 phone_time = person.phone_time
@@ -294,15 +316,20 @@ class Tracker:
                 phone_str = f"  | 📱 {person.phone_sightings}x ({phone_time:.0f}s)" if person.phone_sightings else ""
                 idle_str  = f"  | idle: {person.idle_time:.0f}s" if person.idle_time > 0 else ""
                 away_str  = f"  | away: {away_time:.0f}s" if away_time > 0 else ""
-                lines.append(f"  [{status}] person {person.person_id} | on floor: {person.total_time:.0f}s"
-                             f"{phone_str}{idle_str}{away_str}")
+                text = (f"  [{status}] person {person.person_id} | on floor: {person.total_time:.0f}s"
+                        f"{phone_str}{idle_str}{away_str}")
+                lines.append((text, person.person_id))
 
         # overwrite previous output
         if self._last_line_count:
             print(f"\033[{self._last_line_count}A", end="")
 
-        for line in lines:
-            # pad terminal width 
-            print(f"{line:<79}")
+        for text, person_id in lines:
+            padded = f"{text:<79}"
+            if person_id is not None:
+                color = self._ANSI_COLORS[(person_id - 1) % len(self._ANSI_COLORS)]
+                print(f"{color}{padded}{self._RESET}")
+            else:
+                print(padded)
 
         self._last_line_count = len(lines)
