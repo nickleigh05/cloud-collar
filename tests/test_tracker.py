@@ -7,7 +7,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 # make `from tracker import ...` work without installing the package
 sys.path.insert(0, str(Path(__file__).parent.parent / "edge"))

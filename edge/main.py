@@ -6,7 +6,6 @@ os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.qpa.*=false"
 import cv2
 from ultralytics import YOLO
 from tracker import Tracker
-from uploader import upload
 
 UPLOAD_INTERVAL = 30  # seconds between uploads
 

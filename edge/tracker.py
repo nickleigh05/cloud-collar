@@ -2,8 +2,6 @@ import time
 
 import numpy as np
 
-from reid import EmbeddingExtractor
-
 # GLOBALS
 SIMILARITY_THRESHOLD = 0.75
 PENDING_FRAMES = 2
@@ -99,7 +97,10 @@ class Tracker:
 
     def __init__(self, extractor=None):
 
-        self.extractor = extractor or EmbeddingExtractor()
+        if extractor is None:
+            from reid import EmbeddingExtractor
+            extractor = EmbeddingExtractor()
+        self.extractor = extractor
         self.persons: dict[int, Person] = {}
         self.track_to_person: dict[int, int] = {}
         self.pending: dict[int, list[np.ndarray]] = {}
