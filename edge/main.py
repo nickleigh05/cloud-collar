@@ -6,14 +6,15 @@ os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.qpa.*=false"
 import cv2
 from ultralytics import YOLO
 from tracker import Tracker
+import uploader
 
 UPLOAD_INTERVAL = 30  # seconds between uploads
 
 model = YOLO('yolov8s.pt')        # person tracking
 phone_model = YOLO('yolov8s.pt')  # phone tracking
 
-VIDEO_PATH = 'data/testingfootage_fixed.MOV'        # swap this file path for footage
-#VIDEO_PATH = 0                                     # swap this for webcam use
+VIDEO_PATH = 'data/testingfootage_fixed.MOV'  # set to 0 for live webcam
+#VIDEO_PATH = 0
 
 SKIP_SECONDS = 10     # change # to skip that many seconds into vid
 
@@ -43,6 +44,7 @@ def main():
 
     tracker = Tracker()
     last_print = 0.0
+    last_upload = 0.0
 
     while True:
         ret, frame = cap.read()
@@ -62,12 +64,17 @@ def main():
         phone_boxes = [pb for pb in all_phone_boxes if _phone_inside_person(pb, person_boxes_np)]
 
         tracker.update(results, phone_boxes, frame)
-        
+
+        now = time.time()
+        if now - last_upload >= UPLOAD_INTERVAL:
+            uploader.upload(tracker)
+            last_upload = now
+
         if time.time() - last_print >= 1.0:
             tracker.print_all()
             last_print = time.time()
             
-        # draw people boxs in different colors
+        # draw people boxes in different colors
         COLORS = [
             (255, 80,  80),   # blue
             (80,  80,  255),  # red

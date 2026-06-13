@@ -2,9 +2,25 @@
 
 ![CI](https://github.com/nickleigh05/cloud-collar/actions/workflows/ci.yml/badge.svg)
 
-Edge-based presence analytics pipeline. A camera feed is processed entirely on a local device — person detection, tracking, and re-identification all run on-device — and only anonymous structured session data is sent to a serverless AWS backend. Raw video never leaves the machine.
+A real-time employee productivity analytics system that tracks behavior — time on the floor, phone usage, idle time — using a camera feed processed entirely on-device. No facial recognition. No video leaves the machine.
 
-Built as a portfolio project demonstrating a full-stack pipeline: edge CV inference, appearance-based re-identification, infrastructure as code, and a serverless backend.
+---
+
+## Demo
+
+> Demo video coming soon.
+
+<!-- Drop your GIF or video link here once recorded -->
+
+---
+
+## Why I built this
+
+I wanted a tool that could actually measure employee productivity in a real workplace — not just headcount, but behavior. How long is someone on the floor? How often are they picking up their phone? Are they idle?
+
+Every existing solution I looked at was either way too invasive (facial recognition, full video streamed to a cloud server) or too shallow to be useful. I wanted something in between: rich behavioral data, with a privacy model I could actually defend.
+
+The core insight is that you don't need to know *who* someone is to track how they behave. Cloud Collar gives every person an anonymous ID based on their appearance and tracks their session from there. The cloud never sees anything except numbers.
 
 ---
 
@@ -25,17 +41,19 @@ Built as a portfolio project demonstrating a full-stack pipeline: edge CV infere
   AWS API Gateway → Lambda → DynamoDB
 ```
 
-### Re-identification
+### Re-identification — the hard part
 
-ByteTrack IDs are short-lived: when someone leaves the frame their track dies, and they come back as a new ID. Cloud Collar layers appearance-based re-ID on top:
+Standard trackers like ByteTrack assign a track ID to each visible person. When someone steps out of frame, the track dies — and when they walk back in, they're a brand new ID. That's fine for object counting, but useless for session-level analytics.
 
-- Each person crop is run through **ResNet18** (pretrained on ImageNet, classifier removed) to produce a 512-d L2-normalized embedding — a fingerprint of how the person looks.
-- A new track buffers `PENDING_FRAMES` samples before being judged, so one blurry frame can't cause a misidentification.
-- The averaged embedding is compared (cosine similarity) against all known persons; above `SIMILARITY_THRESHOLD` the track is merged, otherwise a new person ID is created.
-- People already visible are excluded from matching — one person can't be in two places at once.
-- Embeddings are refreshed as a running average every `EMBED_EVERY` frames, adapting to lighting and pose changes over time.
+Cloud Collar layers appearance-based re-identification on top to maintain continuity:
 
-### Metrics tracked per person
+- Each person crop is run through a **ResNet18** backbone (pretrained on ImageNet, classifier removed) to produce a 512-d L2-normalized embedding — a fingerprint of how that person looks.
+- New tracks buffer a few frames before a decision is made, so one blurry frame can't cause a misidentification.
+- The averaged embedding is compared against all known persons using cosine similarity. Above the match threshold, the track is merged into the existing record. Below it, a new person ID is created.
+- People currently in frame are excluded from matching — one person can't be in two places at once.
+- Embeddings are refreshed as a running average every 15 frames, adapting to lighting and pose changes over time.
+
+### What gets tracked per person
 
 | Metric | Description |
 |---|---|
@@ -46,16 +64,19 @@ ByteTrack IDs are short-lived: when someone leaves the frame their track dies, a
 
 ---
 
-## Stack
+## Tech stack — and why
 
-| Layer | Technology |
-|---|---|
-| Detection | YOLOv8s + ByteTrack (Ultralytics) |
-| Re-ID | ResNet18 (torchvision) |
-| Video I/O | OpenCV |
-| Cloud | AWS Lambda + DynamoDB + API Gateway |
-| Infrastructure | Terraform |
-| CI | GitHub Actions + pytest + ruff |
+**YOLOv8s** — Fast enough for real-time inference on edge hardware without a dedicated GPU. The small variant hits the right balance of speed and accuracy for person detection.
+
+**ByteTrack** — Built into Ultralytics, handles short-lived track assignment with no extra configuration. Paired with the re-ID layer, it becomes a robust full-session tracker.
+
+**ResNet18** — Lightweight enough to run on a Raspberry Pi. With the classification head removed, the final feature layer produces appearance embeddings that generalize well to unseen people without any fine-tuning.
+
+**AWS Lambda** — Serverless, so the backend scales to zero when the system isn't running. No instances to manage, and the cost for a single-camera deployment is negligible.
+
+**DynamoDB** — Pay-per-request and schemaless. Session records have a variable number of persons, so a fixed relational schema would just add friction.
+
+**Terraform** — One `terraform apply` stands up the entire backend in about 30 seconds. `terraform destroy` tears it down cleanly. The whole infrastructure is version-controlled and reproducible.
 
 ---
 
@@ -135,18 +156,21 @@ cloud-collar/
 
 ## Privacy
 
-- Raw video never leaves the device. All inference is local.
-- No facial recognition. Embeddings describe whole-body appearance, live only in memory for the duration of a run, and are never uploaded.
-- The cloud stores only anonymous numeric IDs, timestamps, and durations.
+This was a first-class design constraint, not an afterthought.
+
+- Raw video never leaves the device. All inference — detection, tracking, re-ID — runs locally.
+- No facial recognition. Embeddings describe whole-body appearance and are never uploaded.
+- The cloud receives only anonymous numeric IDs, timestamps, and durations.
+- Embeddings live only in memory for the duration of a run and are discarded on exit.
 - Any real deployment requires informed consent and visible signage.
 
 ---
 
-## Running tests
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-Tests use fake embeddings — no camera or GPU required. CI runs on every push.
+Tests use fake embeddings — no camera or GPU needed. CI runs on every push.
