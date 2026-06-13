@@ -1,7 +1,11 @@
 venv/
 __pycache__/
 *.pyc
-data/*.mp4
-data/*.mov
-data/*.avi
+*.pt
+*.mp4
+*.mov
+*.avi
+*.MOV
+*.MP4
+*.AVI
 .env

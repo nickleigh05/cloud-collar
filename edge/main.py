@@ -8,27 +8,15 @@ from ultralytics import YOLO
 from tracker import Tracker
 from uploader import upload
 
-UPLOAD_INTERVAL = 30  # seconds between periodic uploads
+UPLOAD_INTERVAL = 30  # seconds between uploads
 
 model = YOLO('yolov8s.pt')        # person tracking
-phone_model = YOLO('yolov8s.pt')  # separate instance — avoids interfering with ByteTrack state
+phone_model = YOLO('yolov8s.pt')  # phone tracking
 
-VIDEO_PATH = 'data/testingfootage_fixed.MOV'     # swap this file path for footage
-#VIDEO_PATH = 0                                  # swap this for webcam use
+VIDEO_PATH = 'data/testingfootage_fixed.MOV'        # swap this file path for footage
+#VIDEO_PATH = 0                                     # swap this for webcam use
 
-SKIP_SECONDS = 10     # ignore this many seconds at the start (camera setup, etc.)
-
-COLORS = [
-    (255, 80,  80),
-    (80,  80,  255),
-    (80,  255, 80),
-    (255, 180, 0),
-    (180, 0,   255),
-    (0,   200, 255),
-    (255, 140, 0),
-    (100, 255, 220),
-]
-
+SKIP_SECONDS = 10     # change # to skip that many seconds into vid
 
 def _phone_inside_person(phone_box, person_boxes) -> bool:
     """Returns True if the phone box center falls inside any person box."""
@@ -56,37 +44,41 @@ def main():
 
     tracker = Tracker()
     last_print = 0.0
-    last_upload = 0.0
 
     while True:
         ret, frame = cap.read()
 
         if not ret:
             print("Video ended")
-            upload(tracker)  # final upload on exit
             break
 
         results = model.track(frame, persist=True, classes=[0], conf=0.6, verbose=False)
 
-        # separate inference pass for phones — no tracking needed, just boxes
+        # no tracking needed, just boxes
         phone_results = phone_model.predict(frame, classes=[67], conf=0.25, verbose=False)
         all_phone_boxes = phone_results[0].boxes.xyxy.cpu().numpy().astype(int) if phone_results[0].boxes else []
 
-        # only keep phones that overlap a person box — filters out phones sitting on counters
+        # filters out phones sitting on counters
         person_boxes_np = results[0].boxes.xyxy.cpu().numpy().astype(int) if results[0].boxes.id is not None else []
         phone_boxes = [pb for pb in all_phone_boxes if _phone_inside_person(pb, person_boxes_np)]
 
         tracker.update(results, phone_boxes, frame)
-
-        now = time.time()
-
-        if now - last_print >= 1.0:
+        
+        if time.time() - last_print >= 1.0:
             tracker.print_all()
-            last_print = now
-
-        if now - last_upload >= UPLOAD_INTERVAL:
-            upload(tracker)
-            last_upload = now
+            last_print = time.time()
+            
+        # draw people boxs in different colors
+        COLORS = [
+            (255, 80,  80),   # blue
+            (80,  80,  255),  # red
+            (80,  255, 80),   # green
+            (255, 180, 0),    # cyan
+            (180, 0,   255),  # magenta
+            (0,   200, 255),  # yellow
+            (255, 140, 0),    # teal
+            (100, 255, 220),  # lime
+        ]
 
         annotated_frame = frame.copy()
         boxes = results[0].boxes
@@ -99,18 +91,18 @@ def main():
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 4)
                 cv2.putText(annotated_frame, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
-
+                
+        # draw phone boxes in white
         for box in phone_boxes:
             x1, y1, x2, y2 = box
             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
             cv2.putText(annotated_frame, "phone", (x1, y1 - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-        display = cv2.resize(annotated_frame, (1280, 720))
+        display = cv2.resize(annotated_frame, (1280, 720))  #  display size
         cv2.imshow('Cloud Collar', display)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            upload(tracker)  # final upload on manual quit
             break
 
     cap.release()
